@@ -7,3 +7,12 @@
 *.vcxproj
 *.filters
 *.user
+/.vs
+*.recipe
+*.ilk
+*.obj
+*.tlog
+*.log
+*.pdb
+*.exe
+*.idb
