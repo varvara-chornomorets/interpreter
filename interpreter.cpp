@@ -1,164 +1,230 @@
 #include <iostream>
 #include <string>
+#include <vector>
+#include <algorithm>
 
-class SimpleCalculator {
-private:
-    bool hasError = false; // error flag
+// token structure
+struct Token {
+    enum Type { NUMBER, PLUS, MINUS, MULTIPLY, DIVIDE, END };
+    Type type;
+    double value;
 
-public:
-    double evaluate(const std::string& expression) {
-        hasError = false; // reset error flag
+    Token(Type t, double v = 0.0) : type(t), value(v) {}
+};
 
-        // remove spaces
-        std::string expr = removeSpaces(expression);
+// pure function: remove spaces
+std::string removeSpaces(const std::string& str) {
+    std::string result;
+    std::copy_if(str.begin(), str.end(), std::back_inserter(result),
+        [](char c) { return c != ' '; });
+    return result;
+}
 
-        // validate input first
-        if (!isValidInput(expr)) {
-            hasError = true;
-            return 0;
-        }
+// pure function: validate input
+bool isValidInput(const std::string& expr) {
+    if (expr.empty()) return false;
 
-        // parse and calculate
-        return parseExpression(expr);
+    // check all characters are valid
+    auto isValidChar = [](char c) {
+        return std::isdigit(c) || c == '+' || c == '-' || c == '*' || c == '/';
+        };
+    if (!std::all_of(expr.begin(), expr.end(), isValidChar)) {
+        return false;
     }
 
-    bool getError() const {
-        return hasError;
+    // check start and end
+    if ((!std::isdigit(expr[0]) && expr[0] != '-') || !std::isdigit(expr.back())) {
+        return false;
     }
 
-    std::string removeSpaces(const std::string& str) {
-        std::string result;
-        for (char c : str) {
-            if (c != ' ') {
-                result += c;
-            }
-        }
-        return result;
-    }
+    // check for invalid operator sequences
+    for (size_t i = 0; i < expr.length() - 1; i++) {
+        char current = expr[i];
+        char next = expr[i + 1];
 
-    bool isValidInput(const std::string& expr) {
-        if (expr.empty()) return false;
+        auto isOperator = [](char c) { return c == '+' || c == '-' || c == '*' || c == '/'; };
 
-        // check if expression contains only digits, +, -, *, and /
-        for (char c : expr) {
-            if (!isdigit(c) && c != '+' && c != '-' && c != '*' && c != '/') {
-                return false;
-            }
-        }
-
-        // check if it starts with digit or minus, and ends with a digit
-        if ((!isdigit(expr[0]) && expr[0] != '-') || !isdigit(expr.back())) {
+        if (isOperator(current) && (next == '+' || next == '*' || next == '/')) {
             return false;
         }
 
-        // check for consecutive operators (but allow minus after * or /)
-        for (size_t i = 0; i < expr.length() - 1; i++) {
-            char current = expr[i];
-            char next = expr[i + 1];
-
-            // no operator after operator, except minus after * or /
-            if ((current == '+' || current == '-' || current == '*' || current == '/') &&
-                (next == '+' || next == '*' || next == '/')) {
-                return false;
-            }
-
-            // minus after plus is not allowed
-            if (current == '+' && next == '-') {
-                return false;
-            }
-
-            // minus after minus is not allowed  
-            if (current == '-' && next == '-') {
-                return false;
-            }
-
-            // minus after * or / is allowed (for negative numbers)
-            if ((current == '*' || current == '/') && next == '-') {
-                continue; // this is ok
-            }
+        // minus after plus or minus not allowed
+        if ((current == '+' || current == '-') && next == '-') {
+            return false;
         }
-
-        return true;
     }
 
-    double parseExpression(const std::string& expr) {
-        // parse addition and subtractiion
-        size_t pos = 0;
-        return parseAddSub(expr, pos);
-    }
+    return true;
+}
 
-    double parseAddSub(const std::string& expr, size_t& pos) {
-        double result = parseMulDiv(expr, pos);
+std::vector<Token> tokenize(const std::string& expr) {
+    std::vector<Token> tokens;
+    size_t pos = 0;
 
-        while (pos < expr.length() && (expr[pos] == '+' || expr[pos] == '-')) {
-            char op = expr[pos];
-            pos++; // skip operator
-            double right = parseMulDiv(expr, pos);
+    while (pos < expr.length()) {
+        if (std::isdigit(expr[pos]) ||
+            (expr[pos] == '-' && (pos == 0 || expr[pos - 1] == '*' || expr[pos - 1] == '/'))) {
 
-            if (op == '+') {
-                result += right;
-            }
-            else {
-                result -= right;
-            }
-        }
-
-        return result;
-    }
-
-    double parseMulDiv(const std::string& expr, size_t& pos) {
-        double result = parseNumber(expr, pos);
-
-        while (pos < expr.length() && (expr[pos] == '*' || expr[pos] == '/')) {
-            char op = expr[pos];
-            pos++; // skip operator
-            double right = parseNumber(expr, pos);
-
-            if (op == '*') {
-                result *= right;
-            }
-            else {
-                if (right == 0) {
-                    std::cout << "Error: Division by zero!" << std::endl;
-                    hasError = true;
-                    return 0;
-                }
-                result /= right;
-            }
-        }
-
-        return result;
-    }
-
-    double parseNumber(const std::string& expr, size_t& pos) {
-        std::string numberStr = "";
-
-        // handle negative sign at beginning or after * or /
-        if (pos < expr.length() && expr[pos] == '-') {
-            if (pos == 0 || expr[pos - 1] == '*' || expr[pos - 1] == '/') {
+            // parse number
+            std::string numberStr;
+            if (expr[pos] == '-') {
                 numberStr += '-';
                 pos++;
             }
-        }
 
-        // parse digits only
-        while (pos < expr.length() && isdigit(expr[pos])) {
-            numberStr += expr[pos];
+            while (pos < expr.length() && std::isdigit(expr[pos])) {
+                numberStr += expr[pos];
+                pos++;
+            }
+
+            if (!numberStr.empty() && numberStr != "-") {
+                tokens.emplace_back(Token::NUMBER, std::stod(numberStr));
+            }
+        }
+        else {
+            // parse operator
+            switch (expr[pos]) {
+            case '+': tokens.emplace_back(Token::PLUS); break;
+            case '-': tokens.emplace_back(Token::MINUS); break;
+            case '*': tokens.emplace_back(Token::MULTIPLY); break;
+            case '/': tokens.emplace_back(Token::DIVIDE); break;
+            }
             pos++;
         }
+    }
 
-        if (numberStr.empty() || numberStr == "-") {
-            return 0;
+    tokens.emplace_back(Token::END);
+    return tokens;
+}
+
+double applyOperation(double left, Token::Type op, double right) {
+    switch (op) {
+    case Token::PLUS: return left + right;
+    case Token::MINUS: return left - right;
+    case Token::MULTIPLY: return left * right;
+    case Token::DIVIDE: return left / right;
+    default: return 0.0;
+    }
+}
+
+// immutable parser class
+class Parser {
+    const std::vector<Token>& tokens;
+    mutable size_t position; // mutable for navigation, but doesn't change token data
+
+public:
+    Parser(const std::vector<Token>& toks) : tokens(toks), position(0) {}
+
+    // pure function: get current token
+    Token current() const {
+        return position < tokens.size() ? tokens[position] : Token(Token::END);
+    }
+
+    // advance position
+    void advance() const { position++; }
+
+    // parse expression with proper precedence
+    std::pair<double, bool> parseExpression() const {
+        return parseAddSub();
+    }
+
+private:
+    // parse addition and subtraction (lower precedence)
+    std::pair<double, bool> parseAddSub() const {
+        auto leftResult = parseMulDiv();
+        if (!leftResult.second) return std::make_pair(0.0, false);
+
+        double result = leftResult.first;
+
+        while (current().type == Token::PLUS || current().type == Token::MINUS) {
+            Token::Type op = current().type;
+            advance();
+
+            auto rightResult = parseMulDiv();
+            if (!rightResult.second) return std::make_pair(0.0, false);
+
+            result = applyOperation(result, op, rightResult.first);
         }
 
-        return std::stod(numberStr);
+        return std::make_pair(result, true);
+    }
+
+    // parse multiplication and division (higher precedence)
+    std::pair<double, bool> parseMulDiv() const {
+        auto leftResult = parseNumber();
+        if (!leftResult.second) return std::make_pair(0.0, false);
+
+        double result = leftResult.first;
+
+        while (current().type == Token::MULTIPLY || current().type == Token::DIVIDE) {
+            Token::Type op = current().type;
+            advance();
+
+            auto rightResult = parseNumber();
+            if (!rightResult.second) return std::make_pair(0.0, false);
+
+            if (op == Token::DIVIDE && rightResult.first == 0.0) {
+                return std::make_pair(0.0, false); // division by zero
+            }
+
+            result = applyOperation(result, op, rightResult.first);
+        }
+
+        return std::make_pair(result, true);
+    }
+
+    // parse number
+    std::pair<double, bool> parseNumber() const {
+        if (current().type == Token::NUMBER) {
+            double value = current().value;
+            advance();
+            return std::make_pair(value, true);
+        }
+        return std::make_pair(0.0, false);
     }
 };
 
+// pure function: evaluate expression
+std::pair<double, bool> evaluate(const std::string& expression) {
+    // functional composition: clean -> validate -> tokenize -> parse
+    std::string cleanExpr = removeSpaces(expression);
+
+    if (!isValidInput(cleanExpr)) {
+        return std::make_pair(0.0, false);
+    }
+
+    std::vector<Token> tokens = tokenize(cleanExpr);
+    Parser parser(tokens);
+
+    auto result = parser.parseExpression();
+
+    // check for division by zero
+    if (!result.second) {
+        return std::make_pair(0.0, false);
+    }
+
+    return result;
+}
+
+// pure function: process single calculation
+void processCalculation(const std::string& input) {
+    if (input.empty()) return;
+
+    auto result = evaluate(input);
+
+    if (!result.second) {
+        std::cout << "Invalid input! Please use only whole numbers, +, -, *, and /" << std::endl;
+        std::cout << "Examples: 5+3, -10+25, 6*7, 15/3, 5*-3, 10/-2" << std::endl;
+    }
+    else {
+        std::cout << result.first << std::endl;
+    }
+}
+
 int main() {
-    SimpleCalculator calculator;
     std::string input;
 
+    std::cout << "Functional Calculator (proper order of operations)" << std::endl;
     std::cout << "Enter expressions or 'q' to exit:" << std::endl;
 
     while (true) {
@@ -169,21 +235,8 @@ int main() {
             break;
         }
 
-        if (input.empty()) {
-            continue;
-        }
-
-        double result = calculator.evaluate(input);
-
-        if (calculator.getError()) {
-            std::cout << "Invalid input! Please use only whole numbers, +, -, *, and /" << std::endl;
-            std::cout << "Examples: 5+3, -10+25, 6*7, 15/3, 5*-3, 10/-2" << std::endl;
-        }
-        else {
-            std::cout << result << std::endl;
-        }
+        processCalculation(input);
     }
 
     return 0;
 }
-
