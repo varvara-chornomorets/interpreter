@@ -107,15 +107,13 @@ double applyOperation(double left, Token::Type op, double right) {
     }
 }
 
-// immutable parser class
 class Parser {
     const std::vector<Token>& tokens;
-    mutable size_t position; // mutable for navigation, but doesn't change token data
+    mutable size_t position; 
 
 public:
     Parser(const std::vector<Token>& toks) : tokens(toks), position(0) {}
 
-    // pure function: get current token
     Token current() const {
         return position < tokens.size() ? tokens[position] : Token(Token::END);
     }
@@ -123,13 +121,13 @@ public:
     // advance position
     void advance() const { position++; }
 
-    // parse expression with proper precedence
+    // parse expression with proper priority
     std::pair<double, bool> parseExpression() const {
         return parseAddSub();
     }
 
 private:
-    // parse addition and subtraction (lower precedence)
+    // parse addition and subtraction 
     std::pair<double, bool> parseAddSub() const {
         auto leftResult = parseMulDiv();
         if (!leftResult.second) return std::make_pair(0.0, false);
@@ -149,7 +147,7 @@ private:
         return std::make_pair(result, true);
     }
 
-    // parse multiplication and division (higher precedence)
+    // parse multiplication and division 
     std::pair<double, bool> parseMulDiv() const {
         auto leftResult = parseNumber();
         if (!leftResult.second) return std::make_pair(0.0, false);
@@ -186,7 +184,6 @@ private:
 
 // pure function: evaluate expression
 std::pair<double, bool> evaluate(const std::string& expression) {
-    // functional composition: clean -> validate -> tokenize -> parse
     std::string cleanExpr = removeSpaces(expression);
 
     if (!isValidInput(cleanExpr)) {
@@ -197,8 +194,8 @@ std::pair<double, bool> evaluate(const std::string& expression) {
     Parser parser(tokens);
 
     auto result = parser.parseExpression();
-
     // check for division by zero
+
     if (!result.second) {
         return std::make_pair(0.0, false);
     }
