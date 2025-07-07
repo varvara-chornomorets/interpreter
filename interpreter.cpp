@@ -82,39 +82,48 @@ public:
     }
 
     double parseExpression(const std::string& expr) {
-        double result = 0;
-        double currentNumber = 0;
-        char operation = '+'; // start with addition
+        // parse addition and subtractiion
+        size_t pos = 0;
+        return parseAddSub(expr, pos);
+    }
 
-        size_t i = 0;
+    double parseAddSub(const std::string& expr, size_t& pos) {
+        double result = parseMulDiv(expr, pos);
 
-        while (i < expr.length()) {
-            // parse a number
-            currentNumber = parseNumber(expr, i);
+        while (pos < expr.length() && (expr[pos] == '+' || expr[pos] == '-')) {
+            char op = expr[pos];
+            pos++; // skip operator
+            double right = parseMulDiv(expr, pos);
 
-            // apply the operation
-            if (operation == '+') {
-                result += currentNumber;
+            if (op == '+') {
+                result += right;
             }
-            else if (operation == '-') {
-                result -= currentNumber;
+            else {
+                result -= right;
             }
-            else if (operation == '*') {
-                result *= currentNumber;
+        }
+
+        return result;
+    }
+
+    double parseMulDiv(const std::string& expr, size_t& pos) {
+        double result = parseNumber(expr, pos);
+
+        while (pos < expr.length() && (expr[pos] == '*' || expr[pos] == '/')) {
+            char op = expr[pos];
+            pos++; // skip operator
+            double right = parseNumber(expr, pos);
+
+            if (op == '*') {
+                result *= right;
             }
-            else if (operation == '/') {
-                if (currentNumber == 0) {
+            else {
+                if (right == 0) {
                     std::cout << "Error: Division by zero!" << std::endl;
                     hasError = true;
                     return 0;
                 }
-                result /= currentNumber;
-            }
-
-            // get next operator if exists
-            if (i < expr.length() && (expr[i] == '+' || expr[i] == '-' || expr[i] == '*' || expr[i] == '/')) {
-                operation = expr[i];
-                i++;
+                result /= right;
             }
         }
 
